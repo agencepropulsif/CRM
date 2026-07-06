@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Users, FileText, Receipt, Building2, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Receipt, Building2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 const navigation = [
+  { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Devis', href: '/devis', icon: FileText },
   { name: 'Factures', href: '/factures', icon: Receipt },
@@ -44,7 +45,7 @@ export function Sidebar() {
           <Building2 className="w-4 h-4 text-sidebar-foreground" strokeWidth={1.8} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-sidebar-foreground leading-tight">Mon Agence</p>
+          <p className="text-sm font-semibold text-sidebar-foreground leading-tight">Propulsif</p>
           <p className="text-xs text-sidebar-foreground/50 leading-tight">Communication</p>
         </div>
       </div>
