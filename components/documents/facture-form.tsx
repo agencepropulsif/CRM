@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,6 +30,22 @@ export type FactureFormData = {
   total_tva: number
   total_ttc: number
   lignes: LigneDocument[]
+  moyens_paiement: MoyenPaiement[]
+  paiement_autre: string
+}
+
+export type MoyenPaiement = 'virement' | 'cheque' | 'especes' | 'carte' | 'autre'
+
+const IBAN = 'FR76 4061 8805 0900 0408 2738'
+
+const genererNumero = async (): Promise<string> => {
+  const supabase = createClient()
+  const annee = new Date().getFullYear()
+  const { count } = await supabase
+    .from('factures')
+    .select('*', { count: 'exact', head: true })
+  const num = String((count ?? 0) + 1).padStart(3, '0')
+  return `${annee}-${num}`
 }
 
 export function FactureForm({ facture, clients, onSubmit, onCancel }: FactureFormProps) {
@@ -51,6 +68,22 @@ export function FactureForm({ facture, clients, onSubmit, onCancel }: FactureFor
   const [lignes, setLignes] = useState<LigneDocument[]>(
     facture?.factures_lignes ?? []
   )
+  const [moyensPaiement, setMoyensPaiement] = useState<MoyenPaiement[]>(['virement'])
+  const [paiementAutre, setPaiementAutre] = useState('')
+
+  useEffect(() => {
+    if (!facture) {
+      genererNumero().then((numero) => {
+        setForm((p) => ({ ...p, numero }))
+      })
+    }
+  }, [facture])
+
+  const toggleMoyen = (moyen: MoyenPaiement) => {
+    setMoyensPaiement((prev) =>
+      prev.includes(moyen) ? prev.filter((m) => m !== moyen) : [...prev, moyen]
+    )
+  }
 
   const totalHT = lignes.reduce((acc, l) => acc + l.quantite * l.prix_unitaire, 0)
   const totalTVA = lignes.reduce((acc, l) => acc + l.quantite * l.prix_unitaire * (l.tva_taux / 100), 0)
@@ -69,18 +102,28 @@ export function FactureForm({ facture, clients, onSubmit, onCancel }: FactureFor
         total_tva: totalTVA,
         total_ttc: totalTTC,
         lignes,
+        moyens_paiement: moyensPaiement,
+        paiement_autre: paiementAutre,
       })
     } finally {
       setLoading(false)
     }
   }
 
+  const moyensOptions: { id: MoyenPaiement; label: string; detail?: string }[] = [
+    { id: 'virement', label: 'Virement bancaire', detail: `IBAN : ${IBAN}` },
+    { id: 'cheque', label: 'Chèque', detail: 'À l\'ordre de Mathys DENAUX' },
+    { id: 'especes', label: 'Espèces' },
+    { id: 'carte', label: 'Carte bancaire' },
+    { id: 'autre', label: 'Autre' },
+  ]
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="numero">Numéro de facture *</Label>
-          <Input id="numero" value={form.numero} onChange={set('numero')} required placeholder="FAC-2024-001" />
+          <Input id="numero" value={form.numero} onChange={set('numero')} required placeholder="2026-001" />
         </div>
 
         <div className="space-y-1.5">
@@ -135,9 +178,44 @@ export function FactureForm({ facture, clients, onSubmit, onCancel }: FactureFor
 
       <Separator />
 
+      {/* MOYENS DE PAIEMENT */}
+      <div className="space-y-3">
+        <Label>Moyens de paiement</Label>
+        <div className="space-y-2">
+          {moyensOptions.map((moyen) => (
+            <div key={moyen.id}>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={moyensPaiement.includes(moyen.id)}
+                  onChange={() => toggleMoyen(moyen.id)}
+                  className="mt-0.5 w-4 h-4 accent-primary"
+                />
+                <div>
+                  <span className="text-sm font-medium text-foreground">{moyen.label}</span>
+                  {moyen.detail && moyensPaiement.includes(moyen.id) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{moyen.detail}</p>
+                  )}
+                </div>
+              </label>
+              {moyen.id === 'autre' && moyensPaiement.includes('autre') && (
+                <Input
+                  className="mt-2 ml-7"
+                  placeholder="Précisez le moyen de paiement..."
+                  value={paiementAutre}
+                  onChange={(e) => setPaiementAutre(e.target.value)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
       <div className="space-y-1.5">
         <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" value={form.notes} onChange={set('notes')} rows={2} placeholder="Conditions de paiement, coordonnées bancaires..." />
+        <Textarea id="notes" value={form.notes} onChange={set('notes')} rows={2} placeholder="Remarques, informations complémentaires..." />
       </div>
 
       <div className="flex justify-end gap-3">
