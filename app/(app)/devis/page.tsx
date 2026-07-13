@@ -11,6 +11,20 @@ import type { Client, Devis, DevisAvecLignes } from '@/lib/types'
 import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft } from 'lucide-react'
 import { formatEur, formatDate } from '@/lib/format'
 
+const loadLogoBase64 = async (): Promise<string | null> => {
+  try {
+    const res = await fetch('/logo.png')
+    const blob = await res.blob()
+    return await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createClient>) => {
   const jsPDF = (await import('jspdf')).default
   const { data: full } = await supabase.from('devis').select('*, devis_lignes(*), clients(*)').eq('id', devis.id).single()
@@ -18,25 +32,38 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   const doc = new jsPDF()
   const client = (full as { clients?: { nom?: string; email?: string; adresse?: string; telephone?: string } }).clients
   const lignes = (full as { devis_lignes?: { designation?: string; quantite?: number; prix_unitaire_ht?: number; tva?: number }[] }).devis_lignes ?? []
-  doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.text('PROPULSIF', 14, 20)
+
+  // LOGO
+  const logoData = await loadLogoBase64()
+  if (logoData) doc.addImage(logoData, 'PNG', 14, 10, 22, 22)
+
+  // HEADER
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(0)
+  doc.text('PROPULSIF', 40, 18)
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
-  doc.text('Mathys DENAUX', 14, 27)
-  doc.text('76 rue des cétoines, 34090 Montpellier', 14, 32)
-  doc.text('agence.propulsif@gmail.com  |  06 75 29 81 06', 14, 37)
-  doc.text('SIREN : 103 651 733', 14, 42)
+  doc.text('Mathys DENAUX', 40, 24)
+  doc.text('76 rue des cétoines, 34090 Montpellier', 40, 29)
+  doc.text('agence.propulsif@gmail.com  |  06 75 29 81 06', 40, 34)
+  doc.text('SIREN : 103 651 733', 40, 39)
+
   doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(0)
-  doc.text(`DEVIS N° ${devis.numero}`, 196, 20, { align: 'right' })
+  doc.text(`DEVIS N° ${devis.numero}`, 196, 18, { align: 'right' })
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
-  doc.text(`Date : ${formatDate(devis.date_creation)}`, 196, 27, { align: 'right' })
-  doc.text(`Validité : ${formatDate(devis.date_validite)}`, 196, 32, { align: 'right' })
-  doc.setDrawColor(220); doc.line(14, 48, 196, 48)
-  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('CLIENT', 14, 58)
+  doc.text(`Date : ${formatDate(devis.date_creation)}`, 196, 25, { align: 'right' })
+  doc.text(`Validité : ${formatDate(devis.date_validite)}`, 196, 30, { align: 'right' })
+
+  doc.setDrawColor(220); doc.line(14, 46, 196, 46)
+
+  // CLIENT
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('CLIENT', 14, 56)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60)
-  doc.text(client?.nom ?? '—', 14, 65)
-  if (client?.email) doc.text(client.email, 14, 70)
-  if (client?.adresse) doc.text(client.adresse, 14, 75)
-  if (client?.telephone) doc.text(client.telephone, 14, 80)
-  const tableTop = 92; const colX = [14, 90, 120, 145, 170]
+  doc.text(client?.nom ?? '—', 14, 63)
+  if (client?.email) doc.text(client.email, 14, 68)
+  if (client?.adresse) doc.text(client.adresse, 14, 73)
+  if (client?.telephone) doc.text(client.telephone, 14, 78)
+
+  // TABLEAU
+  const tableTop = 90; const colX = [14, 90, 120, 145, 170]
   doc.setFillColor(40, 40, 40); doc.rect(14, tableTop - 6, 182, 8, 'F')
   doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255)
   ;['Désignation', 'Qté', 'Prix HT', 'TVA %', 'Montant HT'].forEach((h, i) => doc.text(h, colX[i], tableTop - 0.5))
@@ -50,11 +77,15 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
     doc.text(formatEur(ht), colX[4], y); y += 8
   })
   doc.setDrawColor(200); doc.line(14, y, 196, y); y += 8
+
+  // TOTAUX
   ;[['Total HT', formatEur(devis.total_ht)], ['TVA', formatEur(devis.total_tva)], ['Total TTC', formatEur(devis.total_ttc)]].forEach(([label, val], i) => {
     if (i === 2) { doc.setFillColor(40, 40, 40); doc.rect(130, y - 5, 66, 8, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold') }
     else { doc.setTextColor(60); doc.setFont('helvetica', 'normal') }
     doc.setFontSize(9); doc.text(label, 132, y); doc.text(val, 194, y, { align: 'right' }); y += 9
   })
+
+  // FOOTER
   doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(140)
   doc.text('Micro-entrepreneur — TVA non applicable, article 293 B du CGI', 105, 285, { align: 'center' })
   doc.save(`Devis_${devis.numero}.pdf`)
@@ -179,7 +210,6 @@ export default function DevisPage() {
         </div>
       ) : (
         <>
-          {/* VUE DESKTOP */}
           <div className="hidden md:block bg-card border border-border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -209,7 +239,6 @@ export default function DevisPage() {
             </Table>
           </div>
 
-          {/* VUE MOBILE - CARTES */}
           <div className="md:hidden space-y-3">
             {devisList.map((devis) => (
               <div key={devis.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
