@@ -37,7 +37,7 @@ export default function DashboardPage() {
         supabase.from('clients').select('*', { count: 'exact', head: true }),
         supabase.from('devis').select('*', { count: 'exact', head: true }).in('statut', ['brouillon', 'envoyé']),
         supabase.from('factures').select('*', { count: 'exact', head: true }).eq('statut', 'non_payee'),
-        supabase.from('factures').select('total_ttc').eq('statut', 'payee').gte('date_creation', firstDay).lte('date_creation', lastDay),
+        supabase.from('factures').select('total_ttc').eq('statut', 'payée').gte('date_creation', firstDay).lte('date_creation', lastDay),
       ])
 
       const caduMois = (facturesMois ?? []).reduce((acc, f) => acc + (f.total_ttc ?? 0), 0)
