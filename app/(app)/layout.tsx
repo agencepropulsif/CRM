@@ -15,7 +15,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="ml-56 flex-1 p-8">
+      {/* Desktop: marge gauche pour la sidebar. Mobile: padding top (topbar) + bottom (bottomnav) */}
+      <main className="flex-1 md:ml-56 pt-14 pb-20 md:pt-0 md:pb-0 p-4 md:p-8">
         {children}
       </main>
     </div>
