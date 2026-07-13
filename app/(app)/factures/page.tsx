@@ -5,13 +5,20 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { FactureForm, type FactureFormData } from '@/components/documents/facture-form'
+import { FactureForm, type FactureFormData, type MoyenPaiement } from '@/components/documents/facture-form'
 import { FactureStatutBadge } from '@/components/documents/statut-badge'
 import type { Client, Facture, FactureAvecLignes } from '@/lib/types'
 import { Plus, Pencil, Trash2, Receipt, Download } from 'lucide-react'
 import { formatEur, formatDate } from '@/lib/format'
 
-const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof createClient>) => {
+const IBAN = 'FR76 4061 8805 0900 0408 2738'
+
+const exportFacturePDF = async (
+  facture: Facture,
+  supabase: ReturnType<typeof createClient>,
+  moyensPaiement: MoyenPaiement[] = ['virement'],
+  paiementAutre = ''
+) => {
   const jsPDF = (await import('jspdf')).default
 
   const { data: full } = await supabase
@@ -123,15 +130,46 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
     y += 9
   })
 
-  // MENTIONS LÉGALES
-  y += 6
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(80)
-  doc.text('Conditions de règlement : paiement à réception de facture.', 14, y)
-  doc.text('Tout retard de paiement entraînera des pénalités au taux légal en vigueur.', 14, y + 5)
-  doc.text('Pas d\'escompte pour paiement anticipé.', 14, y + 10)
+  // MOYENS DE PAIEMENT
+  if (moyensPaiement.length > 0) {
+    y += 6
+    doc.setDrawColor(220)
+    doc.line(14, y, 196, y)
+    y += 6
 
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0)
+    doc.text('MODALITÉS DE PAIEMENT', 14, y)
+    y += 6
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(60)
+
+    if (moyensPaiement.includes('virement')) {
+      doc.text(`Virement bancaire — IBAN : ${IBAN}`, 14, y)
+      y += 5
+    }
+    if (moyensPaiement.includes('cheque')) {
+      doc.text('Chèque — À l\'ordre de Mathys DENAUX', 14, y)
+      y += 5
+    }
+    if (moyensPaiement.includes('especes')) {
+      doc.text('Espèces', 14, y)
+      y += 5
+    }
+    if (moyensPaiement.includes('carte')) {
+      doc.text('Carte bancaire', 14, y)
+      y += 5
+    }
+    if (moyensPaiement.includes('autre') && paiementAutre) {
+      doc.text(paiementAutre, 14, y)
+      y += 5
+    }
+  }
+
+  // FOOTER
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'italic')
   doc.setTextColor(140)
@@ -148,6 +186,7 @@ export default function FacturesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FactureAvecLignes | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [pdfMoyens, setPdfMoyens] = useState<Record<string, { moyens: MoyenPaiement[]; autre: string }>>({})
 
   const fetchFactures = async () => {
     const { data } = await supabase
@@ -185,7 +224,7 @@ export default function FacturesPage() {
   }
 
   const handleSubmit = async (formData: FactureFormData) => {
-    const { lignes, ...factureData } = formData
+    const { lignes, moyens_paiement, paiement_autre, ...factureData } = formData
 
     if (editing) {
       await supabase.from('factures').update({
@@ -206,6 +245,7 @@ export default function FacturesPage() {
           lignes.map((l, i) => ({ ...l, facture_id: editing.id, ordre: i }))
         )
       }
+      setPdfMoyens((p) => ({ ...p, [editing.id]: { moyens: moyens_paiement, autre: paiement_autre } }))
     } else {
       const { data: newFacture } = await supabase
         .from('factures')
@@ -227,6 +267,9 @@ export default function FacturesPage() {
         await supabase.from('factures_lignes').insert(
           lignes.map((l, i) => ({ ...l, facture_id: newFacture.id, ordre: i }))
         )
+      }
+      if (newFacture) {
+        setPdfMoyens((p) => ({ ...p, [newFacture.id]: { moyens: moyens_paiement, autre: paiement_autre } }))
       }
     }
 
@@ -295,7 +338,15 @@ export default function FacturesPage() {
                   <TableCell className="text-right font-medium tabular-nums">{formatEur(facture.total_ttc)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Exporter PDF" onClick={() => exportFacturePDF(facture, supabase)}>
+                      <Button
+                        variant="ghost" size="icon" className="h-8 w-8" title="Exporter PDF"
+                        onClick={() => exportFacturePDF(
+                          facture,
+                          supabase,
+                          pdfMoyens[facture.id]?.moyens ?? ['virement'],
+                          pdfMoyens[facture.id]?.autre ?? ''
+                        )}
+                      >
                         <Download className="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(facture)}>
