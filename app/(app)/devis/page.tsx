@@ -35,7 +35,7 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
 
   // LOGO
   const logoData = await loadLogoBase64()
-  if (logoData) doc.addImage(logoData, 'PNG', 14, 10, 22, 22)
+  if (logoData) doc.addImage(logoData, 'PNG', 14, 16, 22, 22)
 
   // HEADER
   doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(0)
