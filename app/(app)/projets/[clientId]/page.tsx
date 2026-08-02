@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProjetForm } from '@/components/projets/projet-form'
 import type { Client, ProjetAvecVisuels, Projet } from '@/lib/types'
-import { Plus, Pencil, Trash2, ArrowLeft, ImageIcon, X, Grid3x3, List, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, ArrowLeft, ImageIcon, X, Grid3x3, List, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type SortKey = 'titre' | 'date_realisation' | 'type_projet'
@@ -27,7 +27,10 @@ export default function ClientProjetsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Projet | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+
+  // Lightbox : on stocke la liste d'images du projet ouvert + l'index affiché
+  const [lightboxImages, setLightboxImages] = useState<string[] | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const [sortKey, setSortKey] = useState<SortKey>('date_realisation')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -120,6 +123,26 @@ export default function ClientProjetsPage() {
     await fetchData()
   }
 
+  const openLightbox = (urls: string[], startIndex: number) => {
+    setLightboxImages(urls)
+    setLightboxIndex(startIndex)
+  }
+
+  const closeLightbox = () => {
+    setLightboxImages(null)
+    setLightboxIndex(0)
+  }
+
+  const nextImage = () => {
+    if (!lightboxImages) return
+    setLightboxIndex((i) => (i + 1) % lightboxImages.length)
+  }
+
+  const prevImage = () => {
+    if (!lightboxImages) return
+    setLightboxIndex((i) => (i - 1 + lightboxImages.length) % lightboxImages.length)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -194,43 +217,52 @@ export default function ClientProjetsPage() {
       ) : viewMode === 'grid' ? (
         /* ===== VUE GRILLE ===== */
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {sortedProjets.map((projet) => (
-            <div key={projet.id} className="bg-card border border-border rounded-lg overflow-hidden group">
-              {projet.projets_visuels?.[0] ? (
-                <button
-                  onClick={() => setLightboxImage(projet.projets_visuels[0].url_image)}
-                  className="w-full aspect-square block"
-                >
-                  <img
-                    src={projet.projets_visuels[0].url_image}
-                    alt={projet.titre}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ) : (
-                <div className="w-full aspect-square flex items-center justify-center bg-muted/30">
-                  <ImageIcon className="w-6 h-6 text-muted-foreground/30" />
-                </div>
-              )}
-              <div className="p-2 space-y-0.5">
-                <div className="flex items-start justify-between gap-1">
-                  <p className="text-xs font-medium text-foreground truncate">{projet.titre}</p>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(projet)}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setDeleteConfirm(projet.id)}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+          {sortedProjets.map((projet) => {
+            const visuels = projet.projets_visuels ?? []
+            const urls = visuels.map((v) => v.url_image)
+            return (
+              <div key={projet.id} className="bg-card border border-border rounded-lg overflow-hidden group">
+                {visuels.length > 0 ? (
+                  <button
+                    onClick={() => openLightbox(urls, 0)}
+                    className="relative w-full aspect-square block"
+                  >
+                    <img
+                      src={visuels[0].url_image}
+                      alt={projet.titre}
+                      className="w-full h-full object-cover"
+                    />
+                    {visuels.length > 1 && (
+                      <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                        +{visuels.length - 1}
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="w-full aspect-square flex items-center justify-center bg-muted/30">
+                    <ImageIcon className="w-6 h-6 text-muted-foreground/30" />
                   </div>
+                )}
+                <div className="p-2 space-y-0.5">
+                  <div className="flex items-start justify-between gap-1">
+                    <p className="text-xs font-medium text-foreground truncate">{projet.titre}</p>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(projet)}>
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteConfirm(projet.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground capitalize truncate">{projet.type_projet?.replace('_', ' ')}</p>
                 </div>
-                <p className="text-[11px] text-muted-foreground capitalize truncate">{projet.type_projet?.replace('_', ' ')}</p>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         /* ===== VUE LISTE (façon Finder) ===== */
@@ -242,39 +274,48 @@ export default function ClientProjetsPage() {
             <div className="w-28">Date</div>
             <div className="w-16" />
           </div>
-          {sortedProjets.map((projet) => (
-            <div key={projet.id} className="flex items-center px-4 py-2 hover:bg-muted/30 group transition-colors">
-              <div className="w-12">
-                {projet.projets_visuels?.[0] ? (
-                  <button onClick={() => setLightboxImage(projet.projets_visuels[0].url_image)}>
-                    <img
-                      src={projet.projets_visuels[0].url_image}
-                      alt={projet.titre}
-                      className="w-8 h-8 rounded object-cover"
-                    />
-                  </button>
-                ) : (
-                  <div className="w-8 h-8 rounded bg-muted/30 flex items-center justify-center">
-                    <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/30" />
-                  </div>
-                )}
+          {sortedProjets.map((projet) => {
+            const visuels = projet.projets_visuels ?? []
+            const urls = visuels.map((v) => v.url_image)
+            return (
+              <div key={projet.id} className="flex items-center px-4 py-2 hover:bg-muted/30 group transition-colors">
+                <div className="w-12">
+                  {visuels.length > 0 ? (
+                    <button onClick={() => openLightbox(urls, 0)} className="relative block">
+                      <img
+                        src={visuels[0].url_image}
+                        alt={projet.titre}
+                        className="w-8 h-8 rounded object-cover"
+                      />
+                      {visuels.length > 1 && (
+                        <span className="absolute -bottom-1 -right-1 bg-black/70 text-white text-[9px] font-medium px-1 rounded-full">
+                          +{visuels.length - 1}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-muted/30 flex items-center justify-center">
+                      <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 text-sm font-medium text-foreground truncate">{projet.titre}</div>
+                <div className="w-32 text-xs text-muted-foreground capitalize truncate">{projet.type_projet?.replace('_', ' ')}</div>
+                <div className="w-28 text-xs text-muted-foreground">{projet.date_realisation ?? '—'}</div>
+                <div className="w-16 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(projet)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteConfirm(projet.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex-1 text-sm font-medium text-foreground truncate">{projet.titre}</div>
-              <div className="w-32 text-xs text-muted-foreground capitalize truncate">{projet.type_projet?.replace('_', ' ')}</div>
-              <div className="w-28 text-xs text-muted-foreground">{projet.date_realisation ?? '—'}</div>
-              <div className="w-16 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(projet)}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button
-                  variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setDeleteConfirm(projet.id)}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -305,23 +346,49 @@ export default function ClientProjetsPage() {
         </DialogContent>
       </Dialog>
 
-      {lightboxImage && (
+      {/* Lightbox plein écran avec navigation entre plusieurs images */}
+      {lightboxImages && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8"
-          onClick={() => setLightboxImage(null)}
+          onClick={closeLightbox}
         >
           <button
             className="absolute top-4 right-4 text-white/70 hover:text-white"
-            onClick={() => setLightboxImage(null)}
+            onClick={closeLightbox}
           >
             <X className="w-8 h-8" />
           </button>
+
+          {lightboxImages.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+              onClick={(e) => { e.stopPropagation(); prevImage() }}
+            >
+              <ChevronLeft className="w-10 h-10" />
+            </button>
+          )}
+
           <img
-            src={lightboxImage}
+            src={lightboxImages[lightboxIndex]}
             alt="Aperçu"
             className="max-w-full max-h-full object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
+
+          {lightboxImages.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+              onClick={(e) => { e.stopPropagation(); nextImage() }}
+            >
+              <ChevronRight className="w-10 h-10" />
+            </button>
+          )}
+
+          {lightboxImages.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+              {lightboxIndex + 1} / {lightboxImages.length}
+            </div>
+          )}
         </div>
       )}
     </div>
