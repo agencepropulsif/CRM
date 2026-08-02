@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProjetForm } from '@/components/projets/projet-form'
 import type { Client, ProjetAvecVisuels, Projet } from '@/lib/types'
-import { Plus, Pencil, Trash2, ArrowLeft, ImageIcon, X, Grid3x3, List, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ArrowLeft, ImageIcon, X, Grid3x3, List, ArrowUpDown, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type SortKey = 'titre' | 'date_realisation' | 'type_projet'
@@ -28,7 +28,6 @@ export default function ClientProjetsPage() {
   const [editing, setEditing] = useState<Projet | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
-  // Lightbox : on stocke la liste d'images du projet ouvert + l'index affiché
   const [lightboxImages, setLightboxImages] = useState<string[] | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -143,6 +142,19 @@ export default function ClientProjetsPage() {
     setLightboxIndex((i) => (i - 1 + lightboxImages.length) % lightboxImages.length)
   }
 
+  const downloadImage = async (url: string) => {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = url.split('/').pop() ?? 'image.jpg'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -161,7 +173,6 @@ export default function ClientProjetsPage() {
         </Button>
       </div>
 
-      {/* ===== BARRE D'OUTILS FINDER ===== */}
       <div className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Trier par</span>
@@ -215,7 +226,6 @@ export default function ClientProjetsPage() {
           </Button>
         </div>
       ) : viewMode === 'grid' ? (
-        /* ===== VUE GRILLE ===== */
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {sortedProjets.map((projet) => {
             const visuels = projet.projets_visuels ?? []
@@ -265,7 +275,6 @@ export default function ClientProjetsPage() {
           })}
         </div>
       ) : (
-        /* ===== VUE LISTE (façon Finder) ===== */
         <div className="bg-card border border-border rounded-lg overflow-hidden divide-y divide-border">
           <div className="flex items-center px-4 py-2 bg-muted/40 text-xs font-medium text-muted-foreground">
             <div className="w-12" />
@@ -346,12 +355,19 @@ export default function ClientProjetsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox plein écran avec navigation entre plusieurs images */}
       {lightboxImages && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8"
           onClick={closeLightbox}
         >
+          <button
+            className="absolute top-4 left-4 flex items-center gap-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-md px-3 py-2 transition-colors"
+            onClick={(e) => { e.stopPropagation(); downloadImage(lightboxImages[lightboxIndex]) }}
+          >
+            <Download className="w-4 h-4" />
+            <span className="text-sm">Télécharger</span>
+          </button>
+
           <button
             className="absolute top-4 right-4 text-white/70 hover:text-white"
             onClick={closeLightbox}
