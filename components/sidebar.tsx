@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, FileText, Receipt, Building2, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Receipt, Building2, LogOut, Menu, X, FolderKanban } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -11,6 +11,7 @@ import type { User } from '@supabase/supabase-js'
 const navigation = [
   { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
+  { name: 'Projets', href: '/projets', icon: FolderKanban },
   { name: 'Devis', href: '/devis', icon: FileText },
   { name: 'Factures', href: '/factures', icon: Receipt },
 ]
