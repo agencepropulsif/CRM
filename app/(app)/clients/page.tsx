@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ClientForm } from '@/components/clients/client-form'
 import type { Client } from '@/lib/types'
-import { Plus, Pencil, Trash2, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, Search } from 'lucide-react'
 
 export default function ClientsPage() {
   const supabase = createClient()
@@ -17,6 +18,7 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Client | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const fetchClients = async () => {
     const { data } = await supabase
@@ -30,6 +32,12 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchClients()
   }, [])
+
+  const filteredClients = useMemo(() => {
+    if (!search.trim()) return clients
+    const q = search.trim().toLowerCase()
+    return clients.filter((c) => c.nom?.toLowerCase().includes(q))
+  }, [clients, search])
 
   const openCreate = () => {
     setEditing(null)
@@ -67,7 +75,7 @@ export default function ClientsPage() {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-foreground">Clients</h1>
-            <p className="text-sm text-muted-foreground">{clients.length} client{clients.length !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-muted-foreground">{filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <Button onClick={openCreate} size="sm" className="gap-2">
@@ -76,18 +84,33 @@ export default function ClientsPage() {
         </Button>
       </div>
 
+      {/* Barre de recherche */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher un client par nom..."
+          className="pl-9"
+        />
+      </div>
+
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
             Chargement...
           </div>
-        ) : clients.length === 0 ? (
+        ) : filteredClients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <Users className="w-8 h-8 text-muted-foreground/30" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">Aucun client pour le moment</p>
-            <Button variant="outline" size="sm" onClick={openCreate} className="mt-2 gap-2">
-              <Plus className="w-4 h-4" /> Ajouter un client
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              {search ? 'Aucun client ne correspond à cette recherche' : 'Aucun client pour le moment'}
+            </p>
+            {!search && (
+              <Button variant="outline" size="sm" onClick={openCreate} className="mt-2 gap-2">
+                <Plus className="w-4 h-4" /> Ajouter un client
+              </Button>
+            )}
           </div>
         ) : (
           <Table>
@@ -102,7 +125,7 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {filteredClients.map((client) => (
                 <TableRow key={client.id} className="group">
                   <TableCell className="font-medium">{client.nom}</TableCell>
                   <TableCell className="text-muted-foreground">{client.email ?? '—'}</TableCell>
