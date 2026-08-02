@@ -61,3 +61,31 @@ export type Facture = {
 export type FactureAvecLignes = Facture & {
   factures_lignes: LigneDocument[]
 }
+export type TypeProjet = 'logo' | 'reseaux_sociaux' | 'flyer' | 'site_web' | 'autre'
+export type StatutProjet = 'en_cours' | 'terminé' | 'archivé'
+
+export type Projet = {
+  id: string
+  client_id: string | null
+  titre: string
+  description: string | null
+  type_projet: TypeProjet | null
+  date_realisation: string | null
+  statut: StatutProjet
+  notes: string | null
+  created_at: string | null
+  clients?: Pick<Client, 'id' | 'nom'>
+}
+
+export type ProjetVisuel = {
+  id: string
+  projet_id: string | null
+  url_image: string
+  legende: string | null
+  ordre: number
+  created_at: string | null
+}
+
+export type ProjetAvecVisuels = Projet & {
+  projets_visuels: ProjetVisuel[]
+}
