@@ -31,7 +31,7 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   if (!full) return
   const doc = new jsPDF()
   const client = (full as { clients?: { nom?: string; email?: string; adresse?: string; telephone?: string } }).clients
-  const lignes = (full as { devis_lignes?: { designation?: string; quantite?: number; prix_unitaire_ht?: number; tva?: number }[] }).devis_lignes ?? []
+  const lignes = (full as { devis_lignes?: { designation?: string; quantite?: number; prix_unitaire?: number; tva_taux?: number }[] }).devis_lignes ?? []
 
   // LOGO
   const logoData = await loadLogoBase64()
@@ -71,9 +71,9 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   let y = tableTop + 6
   lignes.forEach((l, idx) => {
     if (idx % 2 === 0) { doc.setFillColor(248, 248, 248); doc.rect(14, y - 5, 182, 7, 'F') }
-    const ht = (l.quantite ?? 0) * (l.prix_unitaire_ht ?? 0)
+    const ht = (l.quantite ?? 0) * (l.prix_unitaire ?? 0)
     doc.text(l.designation ?? '', colX[0], y); doc.text(String(l.quantite ?? ''), colX[1], y)
-    doc.text(formatEur(l.prix_unitaire_ht ?? 0), colX[2], y); doc.text(`${l.tva ?? 0} %`, colX[3], y)
+    doc.text(formatEur(l.prix_unitaire ?? 0), colX[2], y); doc.text(`${l.tva_taux ?? 0} %`, colX[3], y)
     doc.text(formatEur(ht), colX[4], y); y += 8
   })
   doc.setDrawColor(200); doc.line(14, y, 196, y); y += 8
@@ -107,9 +107,9 @@ const convertirEnFacture = async (devis: Devis, supabase: ReturnType<typeof crea
   }).select().single()
   if (newFacture && full.devis_lignes?.length > 0) {
     await supabase.from('factures_lignes').insert(
-      full.devis_lignes.map((l: { designation: string; quantite: number; prix_unitaire_ht: number; tva: number }, i: number) => ({
+      full.devis_lignes.map((l: { designation: string; quantite: number; prix_unitaire: number; tva_taux: number }, i: number) => ({
         facture_id: newFacture.id, designation: l.designation, quantite: l.quantite,
-        prix_unitaire_ht: l.prix_unitaire_ht, tva: l.tva, ordre: i,
+        prix_unitaire: l.prix_unitaire, tva_taux: l.tva_taux, ordre: i,
       }))
     )
   }
