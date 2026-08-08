@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     const { data: devis } = await supabase
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       token = created?.token
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://crm-32yk.vercel.app'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://crm-cgsn.vercel.app'
     const lienSignature = `${siteUrl}/signature/${token}`
 
     const resendRes = await fetch('https://api.resend.com/emails', {
