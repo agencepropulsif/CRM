@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DevisForm, type DevisFormData } from '@/components/documents/devis-form'
 import { DevisStatutBadge } from '@/components/documents/statut-badge'
 import type { Client, Devis, DevisAvecLignes } from '@/lib/types'
-import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft, Send } from 'lucide-react'
 import { formatEur, formatDate } from '@/lib/format'
 import type { MoyenPaiement } from '@/components/documents/facture-form'
 
@@ -112,6 +112,27 @@ const exportDevisPDF = async (
   doc.save(`Devis_${devis.numero}.pdf`)
 }
 
+const envoyerDevisParEmail = async (devis: Devis, onSuccess: () => void) => {
+  const confirmation = confirm(`Envoyer le devis ${devis.numero} par email au client ?`)
+  if (!confirmation) return
+  try {
+    const res = await fetch('/api/devis/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ devisId: devis.id }),
+    })
+    const result = await res.json()
+    if (!res.ok) {
+      alert(`❌ Erreur : ${result.error}`)
+      return
+    }
+    alert(`✅ Devis envoyé par email !`)
+    onSuccess()
+  } catch (e) {
+    alert(`❌ Erreur : ${e}`)
+  }
+}
+
 const convertirEnFacture = async (devis: Devis, supabase: ReturnType<typeof createClient>, onSuccess: () => void) => {
   const { data: full } = await supabase.from('devis').select('*, devis_lignes(*)').eq('id', devis.id).single()
   if (!full) return
@@ -192,6 +213,9 @@ export default function DevisPage() {
 
   const ActionButtons = ({ devis }: { devis: Devis }) => (
     <div className="flex items-center gap-1">
+      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10" title="Envoyer par email" onClick={() => envoyerDevisParEmail(devis, fetchDevis)}>
+        <Send className="w-3.5 h-3.5" />
+      </Button>
       <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-500/10" title="Convertir en facture" onClick={() => convertirEnFacture(devis, supabase, fetchDevis)}>
         <ArrowRightLeft className="w-3.5 h-3.5" />
       </Button>
