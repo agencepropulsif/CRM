@@ -123,7 +123,9 @@ const exportDevisPDF = async (
 
   doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(140)
   doc.text('Micro-entrepreneur — TVA non applicable, article 293 B du CGI', 105, 285, { align: 'center' })
-  doc.save(`Devis_${devis.numero}.pdf`)
+
+  const blobUrl = doc.output('bloburl')
+  window.open(blobUrl, '_blank')
 }
 
 const envoyerDevisParEmail = async (devis: Devis, onSuccess: () => void) => {
@@ -237,7 +239,7 @@ export default function DevisClientPage() {
       <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-500/10" title="Convertir en facture" onClick={() => convertirEnFacture(devis, supabase, fetchData)}>
         <ArrowRightLeft className="w-3.5 h-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" title="Exporter PDF"
+      <Button variant="ghost" size="icon" className="h-8 w-8" title="Aperçu PDF"
         onClick={() => exportDevisPDF(devis, supabase, pdfMoyens[devis.id]?.moyens ?? ['virement'], pdfMoyens[devis.id]?.autre ?? '')}>
         <Download className="w-3.5 h-3.5" />
       </Button>
