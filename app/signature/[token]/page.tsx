@@ -42,12 +42,16 @@ export default function SignaturePage() {
 
   const handleSign = async () => {
     setSigning(true)
-    await supabase
-      .from('devis_signatures')
-      .update({ statut: 'signé', signe_le: new Date().toISOString() })
-      .eq('token', token)
-    await supabase.from('devis').update({ statut: 'accepté' }).eq('id', signature.devis_id)
-    setSignature((p: any) => ({ ...p, statut: 'signé' }))
+    const res = await fetch('/api/devis/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (res.ok) {
+      setSignature((p: any) => ({ ...p, statut: 'signé' }))
+    } else {
+      alert("Une erreur est survenue, réessayez.")
+    }
     setSigning(false)
   }
 
