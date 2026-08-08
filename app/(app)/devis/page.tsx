@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft } from 'lucide
 import { formatEur, formatDate } from '@/lib/format'
 import type { MoyenPaiement } from '@/components/documents/facture-form'
 
-const IBAN = 'FR76 4061 8805 0900 0408 2738'
+const IBAN = 'FR76 4061 8805 0900 0408 2738 448'
 
 const loadLogoBase64 = async (): Promise<string | null> => {
   try {
