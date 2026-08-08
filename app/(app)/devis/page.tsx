@@ -10,6 +10,9 @@ import { DevisStatutBadge } from '@/components/documents/statut-badge'
 import type { Client, Devis, DevisAvecLignes } from '@/lib/types'
 import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft } from 'lucide-react'
 import { formatEur, formatDate } from '@/lib/format'
+import type { MoyenPaiement } from '@/components/documents/facture-form'
+
+const IBAN = 'FR76 4061 8805 0900 0408 2738'
 
 const loadLogoBase64 = async (): Promise<string | null> => {
   try {
@@ -25,7 +28,12 @@ const loadLogoBase64 = async (): Promise<string | null> => {
   }
 }
 
-const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createClient>) => {
+const exportDevisPDF = async (
+  devis: Devis,
+  supabase: ReturnType<typeof createClient>,
+  moyensPaiement: MoyenPaiement[] = ['virement'],
+  paiementAutre = ''
+) => {
   const jsPDF = (await import('jspdf')).default
   const { data: full } = await supabase.from('devis').select('*, devis_lignes(*), clients(*)').eq('id', devis.id).single()
   if (!full) return
@@ -33,11 +41,9 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   const client = (full as { clients?: { nom?: string; email?: string; adresse?: string; telephone?: string } }).clients
   const lignes = (full as { devis_lignes?: { designation?: string; quantite?: number; prix_unitaire?: number; tva_taux?: number }[] }).devis_lignes ?? []
 
-  // LOGO
   const logoData = await loadLogoBase64()
   if (logoData) doc.addImage(logoData, 'PNG', 14, 16, 22, 22)
 
-  // HEADER
   doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(0)
   doc.text('PROPULSIF', 40, 18)
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
@@ -54,7 +60,6 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
 
   doc.setDrawColor(220); doc.line(14, 46, 196, 46)
 
-  // CLIENT
   doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('CLIENT', 14, 56)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60)
   doc.text(client?.nom ?? '—', 14, 63)
@@ -62,7 +67,6 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   if (client?.adresse) doc.text(client.adresse, 14, 73)
   if (client?.telephone) doc.text(client.telephone, 14, 78)
 
-  // TABLEAU
   const tableTop = 90; const colX = [14, 90, 120, 145, 170]
   doc.setFillColor(40, 40, 40); doc.rect(14, tableTop - 6, 182, 8, 'F')
   doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255)
@@ -78,14 +82,31 @@ const exportDevisPDF = async (devis: Devis, supabase: ReturnType<typeof createCl
   })
   doc.setDrawColor(200); doc.line(14, y, 196, y); y += 8
 
-  // TOTAUX
   ;[['Total HT', formatEur(devis.total_ht)], ['TVA', formatEur(devis.total_tva)], ['Total TTC', formatEur(devis.total_ttc)]].forEach(([label, val], i) => {
     if (i === 2) { doc.setFillColor(40, 40, 40); doc.rect(130, y - 5, 66, 8, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold') }
     else { doc.setTextColor(60); doc.setFont('helvetica', 'normal') }
     doc.setFontSize(9); doc.text(label, 132, y); doc.text(val, 194, y, { align: 'right' }); y += 9
   })
 
-  // FOOTER
+  if (moyensPaiement.length > 0) {
+    y += 6; doc.setDrawColor(220); doc.line(14, y, 196, y); y += 6
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('MODALITÉS DE PAIEMENT', 14, y); y += 6
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60)
+    if (moyensPaiement.includes('virement')) { doc.text(`Virement bancaire — IBAN : ${IBAN}`, 14, y); y += 5 }
+    if (moyensPaiement.includes('cheque')) { doc.text("Chèque — À l'ordre de Mathys DENAUX", 14, y); y += 5 }
+    if (moyensPaiement.includes('especes')) { doc.text('Espèces', 14, y); y += 5 }
+    if (moyensPaiement.includes('carte')) { doc.text('Carte bancaire', 14, y); y += 5 }
+    if (moyensPaiement.includes('autre') && paiementAutre) { doc.text(paiementAutre, 14, y); y += 5 }
+  }
+
+  if (devis.notes) {
+    y += 6; doc.setDrawColor(220); doc.line(14, y, 196, y); y += 6
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('NOTES', 14, y); y += 6
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60)
+    const notesLines = doc.splitTextToSize(devis.notes, 182)
+    doc.text(notesLines, 14, y); y += notesLines.length * 4.5
+  }
+
   doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(140)
   doc.text('Micro-entrepreneur — TVA non applicable, article 293 B du CGI', 105, 285, { align: 'center' })
   doc.save(`Devis_${devis.numero}.pdf`)
@@ -126,6 +147,7 @@ export default function DevisPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<DevisAvecLignes | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [pdfMoyens, setPdfMoyens] = useState<Record<string, { moyens: MoyenPaiement[]; autre: string }>>({})
 
   const fetchDevis = async () => {
     const { data } = await supabase.from('devis').select('*, clients(id, nom, email)').order('created_at', { ascending: false })
@@ -148,14 +170,16 @@ export default function DevisPage() {
   }
 
   const handleSubmit = async (formData: DevisFormData) => {
-    const { lignes, ...devisData } = formData
+    const { lignes, moyens_paiement, paiement_autre, ...devisData } = formData
     if (editing) {
       await supabase.from('devis').update({ numero: devisData.numero, client_id: devisData.client_id || null, date_creation: devisData.date_creation, date_validite: devisData.date_validite, statut: devisData.statut, notes: devisData.notes, total_ht: devisData.total_ht, total_tva: devisData.total_tva, total_ttc: devisData.total_ttc }).eq('id', editing.id)
       await supabase.from('devis_lignes').delete().eq('devis_id', editing.id)
       if (lignes.length > 0) await supabase.from('devis_lignes').insert(lignes.map((l, i) => ({ ...l, devis_id: editing.id, ordre: i })))
+      setPdfMoyens((p) => ({ ...p, [editing.id]: { moyens: moyens_paiement, autre: paiement_autre } }))
     } else {
       const { data: newDevis } = await supabase.from('devis').insert({ numero: devisData.numero, client_id: devisData.client_id || null, date_creation: devisData.date_creation, date_validite: devisData.date_validite, statut: devisData.statut, notes: devisData.notes, total_ht: devisData.total_ht, total_tva: devisData.total_tva, total_ttc: devisData.total_ttc }).select().single()
       if (newDevis && lignes.length > 0) await supabase.from('devis_lignes').insert(lignes.map((l, i) => ({ ...l, devis_id: newDevis.id, ordre: i })))
+      if (newDevis) setPdfMoyens((p) => ({ ...p, [newDevis.id]: { moyens: moyens_paiement, autre: paiement_autre } }))
     }
     setDialogOpen(false); setEditing(null); await fetchDevis()
   }
@@ -171,7 +195,8 @@ export default function DevisPage() {
       <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-500/10" title="Convertir en facture" onClick={() => convertirEnFacture(devis, supabase, fetchDevis)}>
         <ArrowRightLeft className="w-3.5 h-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" title="Exporter PDF" onClick={() => exportDevisPDF(devis, supabase)}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" title="Exporter PDF"
+        onClick={() => exportDevisPDF(devis, supabase, pdfMoyens[devis.id]?.moyens ?? ['virement'], pdfMoyens[devis.id]?.autre ?? '')}>
         <Download className="w-3.5 h-3.5" />
       </Button>
       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(devis)}>
