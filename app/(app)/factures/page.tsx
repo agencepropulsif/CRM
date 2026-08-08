@@ -35,11 +35,9 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
   const client = (full as { clients?: { nom?: string; email?: string; adresse?: string; telephone?: string } }).clients
   const lignes = (full as { factures_lignes?: { designation?: string; quantite?: number; prix_unitaire?: number; tva_taux?: number }[] }).factures_lignes ?? []
 
-  // LOGO
   const logoData = await loadLogoBase64()
   if (logoData) doc.addImage(logoData, 'PNG', 14, 16, 22, 22)
 
-  // HEADER
   doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(0)
   doc.text('PROPULSIF', 40, 18)
   doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
@@ -56,7 +54,6 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
 
   doc.setDrawColor(220); doc.line(14, 46, 196, 46)
 
-  // CLIENT
   doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('CLIENT', 14, 56)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60)
   doc.text(client?.nom ?? '—', 14, 63)
@@ -64,7 +61,6 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
   if (client?.adresse) doc.text(client.adresse, 14, 73)
   if (client?.telephone) doc.text(client.telephone, 14, 78)
 
-  // TABLEAU
   const tableTop = 90; const colX = [14, 90, 120, 145, 170]
   doc.setFillColor(40, 40, 40); doc.rect(14, tableTop - 6, 182, 8, 'F')
   doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255)
@@ -80,14 +76,12 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
   })
   doc.setDrawColor(200); doc.line(14, y, 196, y); y += 8
 
-  // TOTAUX
   ;[['Total HT', formatEur(facture.total_ht)], ['TVA', formatEur(facture.total_tva)], ['Total TTC', formatEur(facture.total_ttc)]].forEach(([label, val], i) => {
     if (i === 2) { doc.setFillColor(40, 40, 40); doc.rect(130, y - 5, 66, 8, 'F'); doc.setTextColor(255); doc.setFont('helvetica', 'bold') }
     else { doc.setTextColor(60); doc.setFont('helvetica', 'normal') }
     doc.setFontSize(9); doc.text(label, 132, y); doc.text(val, 194, y, { align: 'right' }); y += 9
   })
 
-  // MOYENS DE PAIEMENT
   if (moyensPaiement.length > 0) {
     y += 6; doc.setDrawColor(220); doc.line(14, y, 196, y); y += 6
     doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('MODALITÉS DE PAIEMENT', 14, y); y += 6
@@ -99,7 +93,14 @@ const exportFacturePDF = async (facture: Facture, supabase: ReturnType<typeof cr
     if (moyensPaiement.includes('autre') && paiementAutre) { doc.text(paiementAutre, 14, y); y += 5 }
   }
 
-  // FOOTER
+  if (facture.notes) {
+    y += 6; doc.setDrawColor(220); doc.line(14, y, 196, y); y += 6
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0); doc.text('NOTES', 14, y); y += 6
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60)
+    const notesLines = doc.splitTextToSize(facture.notes, 182)
+    doc.text(notesLines, 14, y); y += notesLines.length * 4.5
+  }
+
   doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(140)
   doc.text('Micro-entrepreneur — TVA non applicable, article 293 B du CGI', 105, 285, { align: 'center' })
   doc.save(`Facture_${facture.numero}.pdf`)
