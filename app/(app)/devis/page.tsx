@@ -155,7 +155,7 @@ const convertirEnFacture = async (devis: Devis, supabase: ReturnType<typeof crea
       }))
     )
   }
-  await supabase.from('devis').update({ statut: 'accepte' }).eq('id', devis.id)
+await supabase.from('devis').update({ statut: 'accepté' }).eq('id', devis.id)
   alert(`✅ Facture ${numero} créée ! Rendez-vous dans l'onglet Factures.`)
   onSuccess()
 }
