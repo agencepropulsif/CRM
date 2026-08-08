@@ -1,18 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DevisForm, type DevisFormData } from '@/components/documents/devis-form'
 import { DevisStatutBadge } from '@/components/documents/statut-badge'
 import type { Client, Devis, DevisAvecLignes } from '@/lib/types'
-import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft, Send } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, Download, ArrowRightLeft, Send, Search, ArrowUpDown } from 'lucide-react'
 import { formatEur, formatDate } from '@/lib/format'
 import type { MoyenPaiement } from '@/components/documents/facture-form'
 
 const IBAN = 'FR76 4061 8805 0900 0408 2738 448'
+
+type SortKey = 'numero' | 'client' | 'date_creation' | 'total_ttc'
+type SortDir = 'asc' | 'desc'
 
 const loadLogoBase64 = async (): Promise<string | null> => {
   try {
@@ -155,7 +160,7 @@ const convertirEnFacture = async (devis: Devis, supabase: ReturnType<typeof crea
       }))
     )
   }
-await supabase.from('devis').update({ statut: 'accepté' }).eq('id', devis.id)
+  await supabase.from('devis').update({ statut: 'accepté' }).eq('id', devis.id)
   alert(`✅ Facture ${numero} créée ! Rendez-vous dans l'onglet Factures.`)
   onSuccess()
 }
@@ -170,6 +175,10 @@ export default function DevisPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pdfMoyens, setPdfMoyens] = useState<Record<string, { moyens: MoyenPaiement[]; autre: string }>>({})
 
+  const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('date_creation')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
   const fetchDevis = async () => {
     const { data } = await supabase.from('devis').select('*, clients(id, nom, email)').order('created_at', { ascending: false })
     setDevisList((data as Devis[]) ?? [])
@@ -179,6 +188,36 @@ export default function DevisPage() {
     setClients(data ?? [])
   }
   useEffect(() => { Promise.all([fetchDevis(), fetchClients()]).then(() => setLoading(false)) }, [])
+
+  const toggleSortDir = () => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+
+  const filteredSortedDevis = useMemo(() => {
+    let list = [...devisList]
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter((d) => {
+        const clientNom = (d as Devis & { clients?: { nom: string } }).clients?.nom ?? ''
+        return clientNom.toLowerCase().includes(q) || d.numero.toLowerCase().includes(q)
+      })
+    }
+    list.sort((a, b) => {
+      let valA: string | number = ''
+      let valB: string | number = ''
+      if (sortKey === 'numero') { valA = a.numero; valB = b.numero }
+      else if (sortKey === 'client') {
+        valA = (a as Devis & { clients?: { nom: string } }).clients?.nom ?? ''
+        valB = (b as Devis & { clients?: { nom: string } }).clients?.nom ?? ''
+      } else if (sortKey === 'total_ttc') { valA = a.total_ttc; valB = b.total_ttc }
+      else { valA = a.date_creation ?? ''; valB = b.date_creation ?? '' }
+
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortDir === 'asc' ? valA - valB : valB - valA
+      }
+      const cmp = String(valA).localeCompare(String(valB))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return list
+  }, [devisList, search, sortKey, sortDir])
 
   const openCreate = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = async (devis: Devis) => {
@@ -241,7 +280,7 @@ export default function DevisPage() {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-foreground">Devis</h1>
-            <p className="text-sm text-muted-foreground">{devisList.length} devis</p>
+            <p className="text-sm text-muted-foreground">{filteredSortedDevis.length} devis</p>
           </div>
         </div>
         <Button onClick={openCreate} size="sm" className="gap-2">
@@ -249,13 +288,47 @@ export default function DevisPage() {
         </Button>
       </div>
 
+      {/* Barre d'outils recherche + tri */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-card border border-border rounded-lg px-3 py-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher client ou numéro..."
+            className="pl-9 h-8"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Trier par</span>
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date_creation">Date</SelectItem>
+              <SelectItem value="client">Client</SelectItem>
+              <SelectItem value="numero">Numéro</SelectItem>
+              <SelectItem value="total_ttc">Montant</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSortDir}>
+            <ArrowUpDown className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Chargement...</div>
-      ) : devisList.length === 0 ? (
+      ) : filteredSortedDevis.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
           <FileText className="w-8 h-8 text-muted-foreground/30" strokeWidth={1.5} />
-          <p className="text-sm text-muted-foreground">Aucun devis pour le moment</p>
-          <Button variant="outline" size="sm" onClick={openCreate} className="mt-2 gap-2"><Plus className="w-4 h-4" /> Créer un devis</Button>
+          <p className="text-sm text-muted-foreground">
+            {search ? 'Aucun devis ne correspond à cette recherche' : 'Aucun devis pour le moment'}
+          </p>
+          {!search && (
+            <Button variant="outline" size="sm" onClick={openCreate} className="mt-2 gap-2"><Plus className="w-4 h-4" /> Créer un devis</Button>
+          )}
         </div>
       ) : (
         <>
@@ -273,7 +346,7 @@ export default function DevisPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {devisList.map((devis) => (
+                {filteredSortedDevis.map((devis) => (
                   <TableRow key={devis.id}>
                     <TableCell className="font-medium font-mono text-sm">{devis.numero}</TableCell>
                     <TableCell>{(devis as Devis & { clients?: { nom: string } }).clients?.nom ?? <span className="text-muted-foreground">—</span>}</TableCell>
@@ -289,7 +362,7 @@ export default function DevisPage() {
           </div>
 
           <div className="md:hidden space-y-3">
-            {devisList.map((devis) => (
+            {filteredSortedDevis.map((devis) => (
               <div key={devis.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
