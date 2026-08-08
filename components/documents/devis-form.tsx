@@ -11,6 +11,7 @@ import { LignesEditor } from '@/components/documents/lignes-editor'
 import { Separator } from '@/components/ui/separator'
 import type { Client, DevisAvecLignes, LigneDocument } from '@/lib/types'
 import { today, addDays } from '@/lib/format'
+import type { MoyenPaiement } from '@/components/documents/facture-form'
 
 type DevisFormProps = {
   devis?: DevisAvecLignes | null
@@ -30,7 +31,11 @@ export type DevisFormData = {
   total_tva: number
   total_ttc: number
   lignes: LigneDocument[]
+  moyens_paiement: MoyenPaiement[]
+  paiement_autre: string
 }
+
+const IBAN = 'FR76 4061 8805 0900 0408 2738'
 
 const genererNumero = async (): Promise<string> => {
   const supabase = createClient()
@@ -62,8 +67,9 @@ export function DevisForm({ devis, clients, onSubmit, onCancel }: DevisFormProps
   const [lignes, setLignes] = useState<LigneDocument[]>(
     devis?.devis_lignes ?? []
   )
+  const [moyensPaiement, setMoyensPaiement] = useState<MoyenPaiement[]>(['virement'])
+  const [paiementAutre, setPaiementAutre] = useState('')
 
-  // Génère le numéro automatiquement uniquement pour un nouveau devis
   useEffect(() => {
     if (!devis) {
       genererNumero().then((numero) => {
@@ -71,6 +77,12 @@ export function DevisForm({ devis, clients, onSubmit, onCancel }: DevisFormProps
       })
     }
   }, [devis])
+
+  const toggleMoyen = (moyen: MoyenPaiement) => {
+    setMoyensPaiement((prev) =>
+      prev.includes(moyen) ? prev.filter((m) => m !== moyen) : [...prev, moyen]
+    )
+  }
 
   const totalHT = lignes.reduce((acc, l) => acc + l.quantite * l.prix_unitaire, 0)
   const totalTVA = lignes.reduce((acc, l) => acc + l.quantite * l.prix_unitaire * (l.tva_taux / 100), 0)
@@ -89,11 +101,21 @@ export function DevisForm({ devis, clients, onSubmit, onCancel }: DevisFormProps
         total_tva: totalTVA,
         total_ttc: totalTTC,
         lignes,
+        moyens_paiement: moyensPaiement,
+        paiement_autre: paiementAutre,
       })
     } finally {
       setLoading(false)
     }
   }
+
+  const moyensOptions: { id: MoyenPaiement; label: string; detail?: string }[] = [
+    { id: 'virement', label: 'Virement bancaire', detail: `IBAN : ${IBAN}` },
+    { id: 'cheque', label: 'Chèque', detail: 'À l\'ordre de Mathys DENAUX' },
+    { id: 'especes', label: 'Espèces' },
+    { id: 'carte', label: 'Carte bancaire' },
+    { id: 'autre', label: 'Autre' },
+  ]
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -152,6 +174,40 @@ export function DevisForm({ devis, clients, onSubmit, onCancel }: DevisFormProps
       <div className="space-y-2">
         <Label>Lignes du devis</Label>
         <LignesEditor lignes={lignes} onChange={setLignes} />
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <Label>Moyens de paiement</Label>
+        <div className="space-y-2">
+          {moyensOptions.map((moyen) => (
+            <div key={moyen.id}>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={moyensPaiement.includes(moyen.id)}
+                  onChange={() => toggleMoyen(moyen.id)}
+                  className="mt-0.5 w-4 h-4 accent-primary"
+                />
+                <div>
+                  <span className="text-sm font-medium text-foreground">{moyen.label}</span>
+                  {moyen.detail && moyensPaiement.includes(moyen.id) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{moyen.detail}</p>
+                  )}
+                </div>
+              </label>
+              {moyen.id === 'autre' && moyensPaiement.includes('autre') && (
+                <Input
+                  className="mt-2 ml-7"
+                  placeholder="Précisez le moyen de paiement..."
+                  value={paiementAutre}
+                  onChange={(e) => setPaiementAutre(e.target.value)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <Separator />
