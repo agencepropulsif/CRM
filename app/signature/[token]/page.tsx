@@ -61,8 +61,13 @@ export default function SignaturePage() {
 
   if (!devis || !signature) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Ce lien de signature n&apos;est plus valide.</p>
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center space-y-2">
+          <p className="text-muted-foreground">Ce lien de signature n&apos;est plus valide.</p>
+          <p className="text-xs text-muted-foreground/60 break-all">Token reçu : {token || '(vide)'}</p>
+          <p className="text-xs text-muted-foreground/60">Signature trouvée : {signature ? 'oui' : 'non'}</p>
+          <p className="text-xs text-muted-foreground/60">Devis trouvé : {devis ? 'oui' : 'non'}</p>
+        </div>
       </div>
     )
   }
