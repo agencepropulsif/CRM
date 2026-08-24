@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { formatEur, formatDate } from '@/lib/format'
 import { CheckCircle2, FileText } from 'lucide-react'
@@ -10,7 +9,6 @@ import { CheckCircle2, FileText } from 'lucide-react'
 export default function SignaturePage() {
   const params = useParams()
   const token = params.token as string
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [devis, setDevis] = useState<any>(null)
@@ -19,22 +17,15 @@ export default function SignaturePage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: sig } = await supabase
-        .from('devis_signatures')
-        .select('*')
-        .eq('token', token)
-        .maybeSingle()
-
-      if (!sig) { setLoading(false); return }
-      setSignature(sig)
-
-      const { data: devisData } = await supabase
-        .from('devis')
-        .select('*, devis_lignes(*), clients(nom, email, adresse)')
-        .eq('id', sig.devis_id)
-        .single()
-
-      setDevis(devisData)
+      try {
+        const res = await fetch(`/api/devis/public?token=${token}`)
+        if (!res.ok) { setLoading(false); return }
+        const result = await res.json()
+        setSignature(result.signature)
+        setDevis(result.devis)
+      } catch {
+        // reste sur null, affichera le message d'erreur
+      }
       setLoading(false)
     }
     load()
