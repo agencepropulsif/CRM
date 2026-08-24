@@ -65,7 +65,6 @@ export default function ProjetsPage() {
 
   const handleDelete = async (id: string) => {
     await supabase.from('projets').delete().eq('client_id', id)
-    await supabase.from('clients').delete().eq('id', id)
     setDeleteConfirm(null)
     await fetchData()
   }
@@ -145,10 +144,10 @@ export default function ProjetsPage() {
       <Dialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null) }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Supprimer ce client ?</DialogTitle>
+            <DialogTitle>Vider ce dossier ?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Cette action est irréversible. Le client et ses projets associés seront supprimés.
+            Cette action est irréversible. Tous les projets de ce client seront supprimés. Le client restera dans la liste des clients.
           </p>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Annuler</Button>
